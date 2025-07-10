@@ -21,6 +21,7 @@ include("config_builder.jl")
 include("de_identify.jl")
 include("exporting.jl")
 include("utils.jl")
+include("preprocessing.jl")
 
 """
     deid_file!(dicts, file_config, project_config, logger)
