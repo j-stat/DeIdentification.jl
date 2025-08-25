@@ -13,7 +13,7 @@ function year_only(val::AbstractString)
         r"([+-]\d{2}):?(\d{2})$" => s"\1\2"  # +05:30 or +0530 -> +0530
     )
 
-    # 1) Try DateTime formats first (covers your med.csv like 2017-02-27T08:00:00.0)
+    # Try DateTime formats first (covers your med.csv like 2017-02-27T08:00:00.0)
     dt_formats = DateFormat.([
         "y-m-dTH:M:S.s",     # 2017-02-27T08:00:00.0
         "y-m-dTH:M:S",       # 2017-02-27T08:00:00
@@ -27,7 +27,7 @@ function year_only(val::AbstractString)
         end
     end
 
-    # 2) Try Date-only formats
+    # Try Date-only formats
     d_formats = DateFormat.([
         "yyyy-mm-dd",
         "yyyy/mm/dd",
@@ -43,7 +43,7 @@ function year_only(val::AbstractString)
         end
     end
 
-    # 3) Plain 4-digit year anywhere in the string (safe fallback)
+    # Plain 4-digit year anywhere in the string (safe fallback)
     m = match(r"\b(1[5-9]\d{2}|20\d{2}|21\d{2})\b", raw)
     return m === nothing ? nothing : m.captures[1]
 end
