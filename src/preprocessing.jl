@@ -1,13 +1,6 @@
 using Dates
 
-# Transformation functions for use with deidentification package 
-
-# NOTE: To add a new transformation for users, just create a function below; 
-# just make sure your function returns a value, e.g., returns the value you want or, if fails, returns nothing 
-
-# YEAR ONLY - take in a date string and extract just the year component
-
-# Public API (multi-dispatch) 
+# -------- Public API (multi-dispatch) --------
 year_only(::Nothing) = nothing
 year_only(::Missing) = nothing
 year_only(d::Date) = string(year(d))
@@ -18,7 +11,7 @@ function year_only(x::Integer)
     (1000 <= x <= 9999) ? string(x) : nothing
 end
 
-# Floats are not meaningful years; return nothing
+# Floats and other reals are not meaningful years; return nothing
 year_only(::Real) = nothing
 
 # Strings: try several formats (incl. ISO-8601 with fractional seconds)
@@ -31,9 +24,7 @@ function year_only(val::AbstractString)
         return raw
     end
 
-    # Normalize common ISO timezone suffixes that Julia Dates can't parse:
-    # - trailing "Z"
-    # - trailing "+hh:mm" or "-hh:mm" (or without the colon)
+    # Normalize common ISO timezone suffixes that Julia Dates can't parse
     norm = replace(raw,
         r"Z$" => "",
         r"([+-]\d{2}:?\d{2})$" => "",
@@ -41,7 +32,7 @@ function year_only(val::AbstractString)
 
     # Try a bunch of common formats (order matters; most specific first)
     formats = DateFormat[
-        dateformat"yyyy-mm-ddTHH:MM:SS.s",   # 2017-02-27T08:00:00.0 / .123 etc.
+        dateformat"yyyy-mm-ddTHH:MM:SS.s",   # 2017-02-27T08:00:00.0
         dateformat"yyyy-mm-ddTHH:MM:SS",     # 2017-02-27T08:00:00
         dateformat"yyyy-mm-ddTHH:MM",        # 2017-02-27T08:00
         dateformat"yyyy-mm-dd HH:MM:SS.s",   # 2017-02-27 08:00:00.0
@@ -71,8 +62,7 @@ function year_only(val::AbstractString)
 
     for fmt in formats
         try
-            # Prefer Date when format is date-only; DateTime when it has time tokens
-            if occursin(r"[HMS]", string(fmt))
+            if occursin(r"[HMS]", string(fmt))   # has time component
                 dt = DateTime(norm, fmt)
                 return string(year(dt))
             else
@@ -84,13 +74,14 @@ function year_only(val::AbstractString)
         end
     end
 
-    # As a last resort, extract the first 4-digit year-looking token in the string.
+    # Last resort: regex extract a 4-digit year-looking token
     if m = match(r"\b(\d{4})\b", raw); m !== nothing
         return m.captures[1]
     end
 
     return nothing
 end
+
 
 # AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
 function age_check(val::AbstractString; max_age::Int = 80)
