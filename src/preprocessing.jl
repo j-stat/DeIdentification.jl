@@ -1,86 +1,37 @@
 using Dates
 
-# -------- Public API (multi-dispatch) --------
-year_only(::Nothing) = nothing
-year_only(::Missing) = nothing
-year_only(d::Date) = string(year(d))
-year_only(dt::DateTime) = string(year(dt))
-
-# Accept 4-digit integer years (e.g., 2017). Others return nothing.
-function year_only(x::Integer)
-    (1000 <= x <= 9999) ? string(x) : nothing
-end
-
-# Floats and other reals are not meaningful years; return nothing
-year_only(::Real) = nothing
-
-# Strings: try several formats (incl. ISO-8601 with fractional seconds)
+# Keep this in Main (via include), so the eval'd transform can find it.
 function year_only(val::AbstractString)
     raw = strip(val)
-    isempty(raw) && return nothing
-
-    # If the string is exactly a 4-digit year, accept directly.
+    isempty(raw) && return ""
+    # fast-path: 4-digit year
     if occursin(r"^\d{4}$", raw)
         return raw
     end
-
-    # Normalize common ISO timezone suffixes that Julia Dates can't parse
-    norm = replace(raw,
-        r"Z$" => "",
-        r"([+-]\d{2}:?\d{2})$" => "",
-    )
-
-    # Try a bunch of common formats (order matters; most specific first)
-    formats = DateFormat[
-        dateformat"yyyy-mm-ddTHH:MM:SS.s",   # 2017-02-27T08:00:00.0
-        dateformat"yyyy-mm-ddTHH:MM:SS",     # 2017-02-27T08:00:00
-        dateformat"yyyy-mm-ddTHH:MM",        # 2017-02-27T08:00
-        dateformat"yyyy-mm-dd HH:MM:SS.s",   # 2017-02-27 08:00:00.0
-        dateformat"yyyy-mm-dd HH:MM:SS",     # 2017-02-27 08:00:00
-        dateformat"yyyy/mm/dd HH:MM:SS",     # 2017/02/27 08:00:00
-        dateformat"mm/dd/yyyy HH:MM:SS",     # 02/27/2017 08:00:00
-        dateformat"dd-mm-yyyy HH:MM:SS",     # 27-02-2017 08:00:00
-
-        # Date-only variants
-        dateformat"yyyy-mm-dd",
-        dateformat"yyyy/mm/dd",
-        dateformat"yyyy.mm.dd",
-        dateformat"mm/dd/yyyy",
-        dateformat"dd-mm-yyyy",
-        dateformat"mm-dd-yyyy",
-        dateformat"dd/mm/yyyy",
-
-        # Year + month (assume day 01)
-        dateformat"yyyy-mm",
-        dateformat"yyyy/mm",
-        dateformat"mm-yyyy",
-        dateformat"mm/yyyy",
-
-        # Year only
-        dateformat"yyyy",
-    ]
-
-    for fmt in formats
+    # normalize common ISO suffixes
+    norm = replace(raw, r"Z$" => "", r"([+-]\d{2}:?\d{2})$" => "")
+    for fmt in (dateformat"yyyy-mm-ddTHH:MM:SS.s",
+                dateformat"yyyy-mm-ddTHH:MM:SS",
+                dateformat"yyyy-mm-dd",
+                dateformat"mm/dd/yyyy",
+                dateformat"dd-mm-yyyy",
+                dateformat"yyyy/mm/dd",
+                dateformat"yyyy.mm.dd")
         try
-            if occursin(r"[HMS]", string(fmt))   # has time component
-                dt = DateTime(norm, fmt)
-                return string(year(dt))
-            else
-                d = Date(norm, fmt)
-                return string(year(d))
-            end
+            return string(year(DateTime(norm, fmt)))
         catch
-            # try next
+            try
+                return string(year(Date(norm, fmt)))
+            catch
+            end
         end
     end
-
-    # Last resort: regex extract a 4-digit year-looking token
     if m = match(r"\b(\d{4})\b", raw); m !== nothing
         return m.captures[1]
     end
-
-    return nothing
+    return ""
 end
+
 
 
 # AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
