@@ -27,60 +27,42 @@ function year_only(val::AbstractString)
     # Normalize common ISO timezone suffixes that Julia Dates can't parse
     norm = replace(raw,
         r"Z$" => "",
-        r"([+-]\d{2}:?\d{2})$" => "",
+        r"([+-]\d{2}):?(\d{2})$" => s"\1\2"  # turn +05:30 or +0530 into +0530
     )
 
-    # Try a bunch of common formats (order matters; most specific first)
-    formats = DateFormat[
-        dateformat"yyyy-mm-ddTHH:MM:SS.s",   # 2017-02-27T08:00:00.0
-        dateformat"yyyy-mm-ddTHH:MM:SS",     # 2017-02-27T08:00:00
-        dateformat"yyyy-mm-ddTHH:MM",        # 2017-02-27T08:00
-        dateformat"yyyy-mm-dd HH:MM:SS.s",   # 2017-02-27 08:00:00.0
-        dateformat"yyyy-mm-dd HH:MM:SS",     # 2017-02-27 08:00:00
-        dateformat"yyyy/mm/dd HH:MM:SS",     # 2017/02/27 08:00:00
-        dateformat"mm/dd/yyyy HH:MM:SS",     # 02/27/2017 08:00:00
-        dateformat"dd-mm-yyyy HH:MM:SS",     # 27-02-2017 08:00:00
+    # Try a sequence of DateTime then Date formats
+    dt_formats = DateFormat.([
+        "yyyy-mm-ddTHH:MM:SS.sss",
+        "yyyy-mm-ddTHH:MM:SS",
+        "yyyy-mm-dd HH:MM:SS.sss",
+        "yyyy-mm-dd HH:MM:SS",
+        "yyyy/mm/dd HH:MM:SS",
+        "mm/dd/yyyy HH:MM:SS",
+    ])
 
-        # Date-only variants
-        dateformat"yyyy-mm-dd",
-        dateformat"yyyy/mm/dd",
-        dateformat"yyyy.mm.dd",
-        dateformat"mm/dd/yyyy",
-        dateformat"dd-mm-yyyy",
-        dateformat"mm-dd-yyyy",
-        dateformat"dd/mm/yyyy",
-
-        # Year + month (assume day 01)
-        dateformat"yyyy-mm",
-        dateformat"yyyy/mm",
-        dateformat"mm-yyyy",
-        dateformat"mm/yyyy",
-
-        # Year only
-        dateformat"yyyy",
-    ]
-
-    for fmt in formats
+    for f in dt_formats
         try
-            if occursin(r"[HMS]", string(fmt))   # has time component
-                dt = DateTime(norm, fmt)
-                return string(year(dt))
-            else
-                d = Date(norm, fmt)
-                return string(year(d))
-            end
+            return string(year(DateTime(norm, f)))
         catch
-            # try next
         end
     end
 
-    # Last resort: regex extract a 4-digit year-looking token
-    m = match(r"\b(\d{4})\b", raw)
-    if m !== nothing
-        return m.captures[1]
+    date_formats = DateFormat.([
+        "yyyy-mm-dd", "yyyy/mm/dd", "yyyy.mm.dd",
+        "mm/dd/yyyy", "dd-mm-yyyy", "dd.mm.yyyy",
+        "yyyymmdd"
+    ])
+
+    for f in date_formats
+        try
+            return string(year(Date(norm, f)))
+        catch
+        end
     end
 
-    return nothing
+    # Last resort: grab the first plausible 4-digit year anywhere in the string
+    m = match(r"\b(1[5-9]\d{2}|20\d{2}|21\d{2})\b", raw)
+    return m === nothing ? nothing : m.captures[1]
 end
 
 
