@@ -61,3 +61,23 @@ function age_check(val::AbstractString; max_age::Int = 80)
     # downstream, you can post-filter all rows where "Age" is blank
     return a <= max_age ? val : nothing
 end
+
+# TESTS 
+function test_year_only()
+    samples = [
+        "2017-02-27T08:00:00.0",
+        "2017-02-27T08:00:00",
+        "2017-02-27 08:00:00",
+        "2017-02-27",
+        "07/04/2020",
+        "2021",
+        "bad-data",
+        ""
+    ]
+
+    println("Testing year_only function:")
+    for s in samples
+        println("Input: ", s, "  =>  Output: ", year_only(s))
+    end
+end
+
