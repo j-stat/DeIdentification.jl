@@ -1,59 +1,49 @@
 using Dates
 
-# be tolerant to missings/nothings
-year_only(::Missing) = nothing
-year_only(::Nothing) = nothing
-
-# main string-based extractor
+# YEAR ONLY - take in a date string and extract just the year component
 function year_only(val::AbstractString)
-    raw = strip(String(val))
-    isempty(raw) && return nothing
-
-    # fast path: plain 4-digit year
-    if occursin(r"^\d{4}$", raw)
-        return raw
+    raw = strip(val)
+    if isempty(raw)
+        return nothing
     end
 
-    # normalize common timezone suffixes so Dates can parse more cases
+    # normalize common ISO timezone suffixes that Dates can't parse
     norm = replace(raw,
         r"Z$" => "",
-        r"([+-]\d{2}):?(\d{2})$" => s"\1\2",  # +05:30 or +0530 -> +0530
+        r"([+-]\d{2}):?(\d{2})$" => s"\1\2"  # +05:30 or +0530 -> +0530
     )
 
-    # try your project’s timestamp first (matches med.csv & your YAML date_format)
-    try
-        return string(year(DateTime(norm, DateFormat("y-m-dTH:M:S.s"))))
-    catch
-    end
-
-    # try nearby ISO/time variants
-    for fmt in (
-        DateFormat("y-m-dTH:M:S"),
-        DateFormat("y-m-d H:M:S.s"),
-        DateFormat("y-m-d H:M:S"),
-    )
+    # 1) Try DateTime formats first (covers your med.csv like 2017-02-27T08:00:00.0)
+    dt_formats = DateFormat.([
+        "y-m-dTH:M:S.s",     # 2017-02-27T08:00:00.0
+        "y-m-dTH:M:S",       # 2017-02-27T08:00:00
+        "y-m-d H:M:S.s",     # 2017-02-27 08:00:00.0
+        "y-m-d H:M:S",       # 2017-02-27 08:00:00
+    ])
+    for f in dt_formats
         try
-            return string(year(DateTime(norm, fmt)))
+            return string(year(DateTime(norm, f)))
         catch
         end
     end
 
-    # try date-only formats
-    for fmt in (
-        DateFormat("yyyy-mm-dd"),
-        DateFormat("yyyy/mm/dd"),
-        DateFormat("yyyy.mm.dd"),
-        DateFormat("mm/dd/yyyy"),
-        DateFormat("dd-mm-yyyy"),
-        DateFormat("yyyymmdd"),
-    )
+    # 2) Try Date-only formats
+    d_formats = DateFormat.([
+        "yyyy-mm-dd",
+        "yyyy/mm/dd",
+        "yyyy.mm.dd",
+        "mm/dd/yyyy",
+        "dd-mm-yyyy",
+        "yyyymmdd",
+    ])
+    for f in d_formats
         try
-            return string(year(Date(norm, fmt)))
+            return string(year(Date(norm, f)))
         catch
         end
     end
 
-    # safe last resort: first plausible 4-digit year
+    # 3) Plain 4-digit year anywhere in the string (safe fallback)
     m = match(r"\b(1[5-9]\d{2}|20\d{2}|21\d{2})\b", raw)
     return m === nothing ? nothing : m.captures[1]
 end
