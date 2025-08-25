@@ -81,3 +81,7 @@ function test_year_only()
     end
 end
 
+# Simple test passthrough
+function echo_test(val)
+    return string("ECHO_", val)
+end
