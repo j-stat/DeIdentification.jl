@@ -49,7 +49,7 @@ function year_only(val::AbstractString)
 end
 
 # AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
-function age_check(val::AbstractString; max_age::Int = 80)
+function age_check(val::AbstractString; max_age::Int = 40)
     # parse the string into an integer
     a = try
         parse(Int, val)
