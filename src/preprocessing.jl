@@ -53,7 +53,7 @@ end
 # Keep ages ≤ max_age; set > max_age (or non-parsable) to `missing`.
 # Works for strings like "52", numbers like 52, and `missing`.
 # Keep ages ≤ max_age; blank (> max_age) or non-parsable as `nothing`
-age_check(x; max_age::Int = 40) = _age_check_any(x, max_age)
+age_check(x; max_age::Int = 80) = _age_check_any(x, max_age)
 
 # Methods
 # Keep ages ≤ max_age; blank (> max_age) or non-parsable as `nothing`
