@@ -50,15 +50,25 @@ end
 
 # AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
 # keep values ≤ max_age, blank out (missing) if > max_age
-age_check(x::AbstractString; max_age::Int=40) = begin
+# Keep ages ≤ max_age; set > max_age (or non-parsable) to `missing`.
+# Works for strings like "52", numbers like 52, and `missing`.
+age_check(x; max_age::Int = 40) = _age_check_any(x, max_age)
+
+# ---- methods ----
+_age_check_any(::Missing, ::Int) = missing
+
+# Strings: strip, parse, compare
+function _age_check_any(x::AbstractString, max_age::Int)
     s = strip(x)
     a = tryparse(Int, s)
-    a === nothing ? missing : (a <= max_age ? x : missing)
+    a === nothing ? missing : (a <= max_age ? a : missing)
 end
 
-age_check(x::Real; max_age::Int=40) = (x <= max_age ? x : missing)
-
-age_check(::Missing; max_age::Int=40) = missing
+# Numerics: coerce to Int (using floor to be safe), compare
+function _age_check_any(x::Real, max_age::Int)
+    a = Int(floor(x))
+    return (0 ≤ a ≤ max_age) ? a : missing
+end
 
 
 # # TESTS 
