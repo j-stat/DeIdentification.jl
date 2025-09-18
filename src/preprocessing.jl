@@ -52,23 +52,27 @@ end
 # keep values ≤ max_age, blank out (missing) if > max_age
 # Keep ages ≤ max_age; set > max_age (or non-parsable) to `missing`.
 # Works for strings like "52", numbers like 52, and `missing`.
+# Keep ages ≤ max_age; blank (> max_age) or non-parsable as `nothing`
 age_check(x; max_age::Int = 40) = _age_check_any(x, max_age)
 
-# ---- methods ----
-_age_check_any(::Missing, ::Int) = missing
+# Methods
+# Keep ages ≤ max_age; blank (> max_age) or non-parsable as `nothing`
+age_check(x; max_age::Int = 40) = _age_check_any(x, max_age)
 
-# Strings: strip, parse, compare
+# Methods
+_age_check_any(::Missing, ::Int) = nothing
+
 function _age_check_any(x::AbstractString, max_age::Int)
     s = strip(x)
-    a = tryparse(Int, s)
-    a === nothing ? missing : (a <= max_age ? a : missing)
+    p = tryparse(Int, s)
+    p === nothing ? nothing : (p <= max_age ? p : nothing)
 end
 
-# Numerics: coerce to Int (using floor to be safe), compare
 function _age_check_any(x::Real, max_age::Int)
     a = Int(floor(x))
-    return (0 ≤ a ≤ max_age) ? a : missing
+    return (0 ≤ a ≤ max_age) ? a : nothing
 end
+
 
 
 # # TESTS 
