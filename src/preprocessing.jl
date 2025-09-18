@@ -89,26 +89,38 @@ end
 function age_check(val::AbstractString; max_age::Int = 80,
                    today::Date = Dates.today(),
                    date_formats::Tuple{Vararg{AbstractString}} = (
-                       "yyyy-mm-dd", "mm/dd/yyyy", "m/d/yyyy",
-                       "mm/dd/yy", "m/d/yy"
+                       "yyyy-mm-dd", "yyyy/mm/dd",
+                       "mm/dd/yyyy", "m/d/yyyy",
+                       "mm/dd/yy", "m/d/yy",
+                       "dd-mm-yyyy", "d-m-yyyy"
                    ))
     sval = strip(val)
 
-    # Try integer age
-    a = try
-        parse(Int, sval)
-    catch
-        nothing
-    end
-    if a !== nothing
-        return (0 ≤ a ≤ max_age) ? string(a) : nothing
+    # Try integer age first
+    if !isempty(sval)
+        a = try
+            parse(Int, sval)
+        catch
+            nothing
+        end
+        if a !== nothing
+            return (0 ≤ a ≤ max_age) ? string(a) : nothing
+        end
     end
 
-    # Try DOB
+    # Try DOB with multiple formats (runtime DateFormat!)
     dob = nothing
     for fmt in date_formats
         try
-            dob = Date(sval, dateformat"$fmt"); break
+            dob = Date(sval, DateFormat(fmt))
+            break
+        catch
+        end
+        # also try DateTime if strings contain time
+        try
+            dt = DateTime(sval, DateFormat(fmt * " HH:MM:SS"))
+            dob = Date(dt)
+            break
         catch
         end
     end
@@ -122,13 +134,10 @@ end
 
 # Helpful overloads
 age_check(a::Integer; max_age::Int = 80) = (0 ≤ a ≤ max_age) ? string(a) : nothing
-
 function age_check(dob::Date; max_age::Int = 80, today::Date = Dates.today())
     age = year(today) - year(dob) - ((month(today), day(today)) < (month(dob), day(dob)) ? 1 : 0)
     return (0 ≤ age ≤ max_age) ? string(age) : nothing
 end
-
-age_check(::Missing; kwargs...) = nothing   # keep this for DataFrames broadcasting
-age_check(::Nothing; kwargs...) = nothing   # optional—only if you may pass `nothing`
-
-end # module
+age_check(dt::DateTime; kwargs...) = age_check(Date(dt); kwargs...)
+age_check(::Missing; kwargs...) = nothing
+# age_check(::Nothing; kwargs...) = nothing   # keep only if you might pass `nothing`
