@@ -49,18 +49,17 @@ function year_only(val::AbstractString)
 end
 
 # AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
-function age_check(val::AbstractString; max_age::Int = 40)
-    # parse the string into an integer
-    a = try
-        parse(Int, val)
-    catch
-        return nothing       # if it isn’t an integer, drop/blank it
-    end
-
-    # if over max_age, return nothing → cell becomes blank
-    # downstream, you can post-filter all rows where "Age" is blank
-    return a <= max_age ? val : nothing
+# keep values ≤ max_age, blank out (missing) if > max_age
+age_check(x::AbstractString; max_age::Int=40) = begin
+    s = strip(x)
+    a = tryparse(Int, s)
+    a === nothing ? missing : (a <= max_age ? x : missing)
 end
+
+age_check(x::Real; max_age::Int=40) = (x <= max_age ? x : missing)
+
+age_check(::Missing; max_age::Int=40) = missing
+
 
 # # TESTS 
 # function test_year_only()
