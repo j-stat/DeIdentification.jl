@@ -86,58 +86,31 @@ end
 #     return string("ECHO_", val)
 # end
 # UPDATED AGE CHECK - handles DOB columns too 
-function age_check(val::AbstractString; max_age::Int = 80,
-                   today::Date = Dates.today(),
-                   date_formats::Tuple{Vararg{AbstractString}} = (
-                       "yyyy-mm-dd", "yyyy/mm/dd",
-                       "mm/dd/yyyy", "m/d/yyyy",
-                       "mm/dd/yy", "m/d/yy",
-                       "dd-mm-yyyy", "d-m-yyyy"
-                   ))
-    sval = strip(val)
+const ISO_DOB_FMT = DateFormat("yyyy-mm-dd")
 
-    # Try integer age first
+# Returns String age (e.g., "38") or nothing if invalid/over max_age
+function age_check(val::AbstractString; max_age::Int=80, today::Date=Dates.today())
+    sval = strip(val)
+    # quick integer age path
     if !isempty(sval)
-        a = try
-            parse(Int, sval)
-        catch
-            nothing
-        end
-        if a !== nothing
+        if (a = try parse(Int, sval) catch nothing end) !== nothing
             return (0 ≤ a ≤ max_age) ? string(a) : nothing
         end
     end
-
-    # Try DOB with multiple formats (runtime DateFormat!)
-    dob = nothing
-    for fmt in date_formats
-        try
-            dob = Date(sval, DateFormat(fmt))
-            break
-        catch
-        end
-        # also try DateTime if strings contain time
-        try
-            dt = DateTime(sval, DateFormat(fmt * " HH:MM:SS"))
-            dob = Date(dt)
-            break
-        catch
-        end
-    end
+    # strict ISO DOB parse
+    dob = try Date(sval, ISO_DOB_FMT) catch nothing end
     if dob === nothing || dob > today
         return nothing
     end
-
     age = year(today) - year(dob) - ((month(today), day(today)) < (month(dob), day(dob)) ? 1 : 0)
     return (0 ≤ age ≤ max_age) ? string(age) : nothing
 end
 
 # Helpful overloads
-age_check(a::Integer; max_age::Int = 80) = (0 ≤ a ≤ max_age) ? string(a) : nothing
-function age_check(dob::Date; max_age::Int = 80, today::Date = Dates.today())
-    age = year(today) - year(dob) - ((month(today), day(today)) < (month(dob), day(dob)) ? 1 : 0)
-    return (0 ≤ age ≤ max_age) ? string(age) : nothing
+age_check(d::Date; max_age::Int=80, today::Date=Dates.today()) = begin
+    age = year(today) - year(d) - ((month(today), day(today)) < (month(d), day(d)) ? 1 : 0)
+    (0 ≤ age ≤ max_age) ? string(age) : nothing
 end
-age_check(dt::DateTime; kwargs...) = age_check(Date(dt); kwargs...)
+age_check(a::Integer; max_age::Int=80) = (0 ≤ a ≤ max_age) ? string(a) : nothing
 age_check(::Missing; kwargs...) = nothing
-# age_check(::Nothing; kwargs...) = nothing   # keep only if you might pass `nothing`
+
