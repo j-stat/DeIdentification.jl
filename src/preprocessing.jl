@@ -67,7 +67,7 @@ Accepts:
 
 Returns `nothing` if parsing fails.
 """
-function age_check(val; refdate::Date = today(), max_age::Int = 90, min_age::Int = 0)
+function age_check(val; refdate::Date = today(), max_age::Int = 60, min_age::Int = 0)
     if val === missing || val === nothing
         return nothing
     elseif val isa Date
