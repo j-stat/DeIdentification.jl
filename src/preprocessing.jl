@@ -68,7 +68,7 @@ Accepts:
 Returns `nothing` if parsing fails.
 """
 # Scalar: return YEAR ONLY (Int) from DOB, capped so age <= max_age
-function age_check(val; refdate::Date = today(), max_age::Int = 25)
+function age_check(val; refdate::Date = today(), max_age::Int = 90)
     # --- parse to Date (same robust rules as before) ---
     if val === missing || val === nothing
         return nothing
