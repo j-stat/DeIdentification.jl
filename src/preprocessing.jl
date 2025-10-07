@@ -56,83 +56,78 @@ end
 # Works with DOB variable 
 # Has a default reference year of today that can be overidden 
 """
-    age_check(dob; max_age::Int=90, ref_year::Int=year(today()),
-                 fmt::DateFormat = dateformat"yyyy-mm-dd", cap::Bool=true)
+    age_check(val; refdate=today())
 
-Compute age from a date of birth (DOB) relative to `ref_year` (age as of Dec 31 of that year).
-If `cap` is true and age exceeds `max_age`, reset the DOB's year to `ref_year - max_age`
-(keeping month/day where possible) so the resulting age equals `max_age`.
+Return integer age as of `refdate` (default: today) for a birth date in `val`.
+Accepts:
+- `YYYY-MM-DD`, `YYYY/MM/DD`
+- DateTime variants like `YYYY-MM-DDTHH:MM:SS(.sss)` (with optional `Z` or `+hh:mm`)
+- `Date`, `DateTime`
+- Excel serial numbers (days since 1899-12-30)
 
-Arguments
-- `dob`: `Date`, `DateTime`, or `String` (ISO 8601 by default: `yyyy-mm-dd`)
-- `max_age`: age cutoff (default 90)
-- `ref_year`: reference year used to compute age (default current year)
-- `fmt`: date format used to parse `String` inputs (default ISO 8601)
-- `cap`: whether to cap ages above `max_age` by adjusting birth year (default true)
-
-Returns a `NamedTuple`:
-- `age::Int`        — computed (possibly capped) age
-- `dob_out::Date`   — original DOB or adjusted DOB if capped
-- `capped::Bool`    — whether a cap/adjustment was applied
-
-Invalid/future DOBs relative to the reference date return `nothing`.
+Returns `nothing` if parsing fails.
 """
-function age_check(dob; max_age::Int=90, ref_year::Int=year(today()),
-                      fmt::DateFormat = dateformat"yyyy-mm-dd", cap::Bool=true)
-
-    refdate = Date(ref_year, 12, 31)
-
-    # Normalize input to Date
-    d::Date = if dob isa Date
-        dob
-    elseif dob isa DateTime
-        Date(dob)
-    elseif dob isa AbstractString
+function age_check(val; refdate::Date = today())
+    # fast paths
+    if val === missing || val === nothing
+        return nothing
+    elseif val isa Date
+        dob = val
+    elseif val isa DateTime
+        dob = Date(val)
+    elseif val isa Integer || val isa Float64
+        # Excel serial date (Windows base 1899-12-30)
         try
-            Date(strip(dob), fmt)
+            dob = Date(1899,12,30) + Day(floor(Int, val))
         catch
             return nothing
         end
+    elseif val isa AbstractString
+        s = strip(String(val))
+        isempty(s) && return nothing
+
+        # normalize timezone suffixes that Date/DateTime can't parse directly
+        s = replace(s, r"Z$" => "", r"([+-]\d{2}):?(\d{2})$" => s"\1\2")
+
+        # try Date first, then DateTime -> Date
+        dob_parsed = nothing
+        date_fmts = (
+            dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d", dateformat"m/d/y", dateformat"m/d/Y"
+        )
+        dt_fmts = (
+            DateFormat("y-m-dTH:M:S.s"),
+            DateFormat("y-m-dTH:M:S"),
+            DateFormat("y-m-d H:M:S.s"),
+            DateFormat("y-m-d H:M:S")
+        )
+
+        for fmt in date_fmts
+            try
+                dob_parsed = Date(s, fmt); break
+            catch
+            end
+        end
+        if dob_parsed === nothing
+            for fmt in dt_fmts
+                try
+                    dob_parsed = Date(DateTime(s, fmt)); break
+                catch
+                end
+            end
+        end
+
+        dob_parsed === nothing && return nothing
+        dob = dob_parsed
     else
         return nothing
     end
 
-    # Reject future DOBs relative to the reference date
-    if d > refdate
-        return nothing
-    end
-
-    # Compute age as of refdate
-    age = _age_as_of(d, refdate)
-
-    if cap && age > max_age
-        newyear = ref_year - max_age
-        d_cap = _rebase_birthyear(d, newyear)
-        # Recompute for safety (should equal max_age)
-        age_cap = _age_as_of(d_cap, refdate)
-        return (age = age_cap, dob_out = d_cap, capped = true)
-    else
-        return (age = age, dob_out = d, capped = false)
-    end
-end
-
-# --- Helpers ---
-
-# Age as of a given reference date
-function _age_as_of(dob::Date, refdate::Date)
+    # compute age
     a = year(refdate) - year(dob)
     if (month(refdate), day(refdate)) < (month(dob), day(dob))
         a -= 1
     end
     return a
-end
-
-# Change the birth year but keep month/day when possible.
-# Handles Feb 29 by clamping to last day of month in non-leap years.
-function _rebase_birthyear(dob::Date, newyear::Int)
-    m = month(dob)
-    d = min(day(dob), day(lastdayofmonth(Date(newyear, m, 1))))
-    return Date(newyear, m, d)
 end
 
 
