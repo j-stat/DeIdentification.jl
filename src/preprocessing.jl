@@ -123,19 +123,6 @@ function age_check(val; refdate::Date = today(), max_age::Int = 90)
     return max(birth_year, cap_year)
 end
 
-# Vectorized: works on DataFrame columns
-function age_check(col::AbstractVector; refdate::Date = today(), max_age::Int = 30, missing_as = missing)
-    out = Vector{Union{Missing, Int}}(undef, length(col))
-    @inbounds for i in eachindex(col)
-        yr = age_check(col[i]; refdate=refdate, max_age=max_age)
-        out[i] = yr === nothing ? missing_as : yr
-    end
-    return out
-end
-
-
-
-
 # age_check(x; max_age::Int = 90) = _age_check_any(x, max_age)
 
 # # Methods
