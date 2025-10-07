@@ -56,7 +56,7 @@ end
 # Works with DOB variable 
 # Has a default reference year of today that can be overidden 
 """
-    age_from_dob(dob; max_age::Int=90, ref_year::Int=year(today()),
+    age_check(dob; max_age::Int=90, ref_year::Int=year(today()),
                  fmt::DateFormat = dateformat"yyyy-mm-dd", cap::Bool=true)
 
 Compute age from a date of birth (DOB) relative to `ref_year` (age as of Dec 31 of that year).
@@ -77,7 +77,7 @@ Returns a `NamedTuple`:
 
 Invalid/future DOBs relative to the reference date return `nothing`.
 """
-function age_from_dob(dob; max_age::Int=90, ref_year::Int=year(today()),
+function age_check(dob; max_age::Int=90, ref_year::Int=year(today()),
                       fmt::DateFormat = dateformat"yyyy-mm-dd", cap::Bool=true)
 
     refdate = Date(ref_year, 12, 31)
