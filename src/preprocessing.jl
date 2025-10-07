@@ -67,15 +67,20 @@ Accepts:
 
 Returns `nothing` if parsing fails.
 """
-function age_check(val; refdate::Date = today(), max_age::Int = 60, min_age::Int = 0)
+# Scalar: return YEAR ONLY (Int) from DOB, capped so age <= max_age
+function age_check(val; refdate::Date = today(), max_age::Int = 90)
+    # --- parse to Date (same robust rules as before) ---
     if val === missing || val === nothing
         return nothing
-    elseif val isa Date
+    end
+
+    dob::Union{Nothing,Date} = nothing
+    if val isa Date
         dob = val
     elseif val isa DateTime
         dob = Date(val)
     elseif val isa Integer || val isa AbstractFloat
-        # Excel serial origin 1899-12-30 (Windows)
+        # Excel serial (Windows origin 1899-12-30)
         try
             dob = Date(1899,12,30) + Day(floor(Int, val))
         catch
@@ -85,46 +90,49 @@ function age_check(val; refdate::Date = today(), max_age::Int = 60, min_age::Int
         s = strip(String(val))
         isempty(s) && return nothing
         s = replace(s, r"Z$" => "", r"([+-]\d{2}):?(\d{2})$" => s"\1\2")
-
-        dob_parsed = nothing
+        # try Date formats
         for fmt in (dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d",
                     dateformat"m/d/y", dateformat"m/d/Y")
             try
-                dob_parsed = Date(s, fmt); break
+                dob = Date(s, fmt); break
             catch
             end
         end
-        if dob_parsed === nothing
+        # try DateTime formats -> Date
+        if dob === nothing
             for fmt in (DateFormat("y-m-dTH:M:S.s"), DateFormat("y-m-dTH:M:S"),
                         DateFormat("y-m-d H:M:S.s"), DateFormat("y-m-d H:M:S"))
                 try
-                    dob_parsed = Date(DateTime(s, fmt)); break
+                    dob = Date(DateTime(s, fmt)); break
                 catch
                 end
             end
         end
-        dob_parsed === nothing && return nothing
-        dob = dob_parsed
     else
         return nothing
     end
 
-    a = year(refdate) - year(dob)
-    if (month(refdate), day(refdate)) < (month(dob), day(dob))
-        a -= 1
-    end
-    # clamp between min_age and max_age
-    return clamp(a, min_age, max_age)
+    dob === nothing && return nothing
+
+    # --- compute year and apply max-age cap ---
+    birth_year = year(dob)
+    cap_year   = year(refdate) - max_age
+
+    # If someone would be older than max_age, move their year up to the cap line.
+    # (i.e., cap to the most recent allowable birth year)
+    return max(birth_year, cap_year)
 end
 
-function age_check(col::AbstractVector; refdate::Date = today(), max_age::Int = 90, min_age::Int = 0, missing_as = nothing)
+# Vectorized: works on DataFrame columns
+function age_check(col::AbstractVector; refdate::Date = today(), max_age::Int = 90, missing_as = missing)
     out = Vector{Union{Missing, Int}}(undef, length(col))
     @inbounds for i in eachindex(col)
-        v = age_check(col[i]; refdate=refdate, max_age=max_age, min_age=min_age)
-        out[i] = v === nothing ? (ismissing(missing_as) ? missing : missing_as) : v
+        yr = age_check(col[i]; refdate=refdate, max_age=max_age)
+        out[i] = yr === nothing ? missing_as : yr
     end
     return out
 end
+
 
 
 
