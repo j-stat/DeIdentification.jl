@@ -67,16 +67,15 @@ Accepts:
 
 Returns `nothing` if parsing fails.
 """
-function age_check(val; refdate::Date = today())
-    # fast paths
+function age_check(val; refdate::Date = today(), max_age::Int = 90, min_age::Int = 0)
     if val === missing || val === nothing
         return nothing
     elseif val isa Date
         dob = val
     elseif val isa DateTime
         dob = Date(val)
-    elseif val isa Integer || val isa Float64
-        # Excel serial date (Windows base 1899-12-30)
+    elseif val isa Integer || val isa AbstractFloat
+        # Excel serial origin 1899-12-30 (Windows)
         try
             dob = Date(1899,12,30) + Day(floor(Int, val))
         catch
@@ -85,49 +84,46 @@ function age_check(val; refdate::Date = today())
     elseif val isa AbstractString
         s = strip(String(val))
         isempty(s) && return nothing
-
-        # normalize timezone suffixes that Date/DateTime can't parse directly
         s = replace(s, r"Z$" => "", r"([+-]\d{2}):?(\d{2})$" => s"\1\2")
 
-        # try Date first, then DateTime -> Date
         dob_parsed = nothing
-        date_fmts = (
-            dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d", dateformat"m/d/y", dateformat"m/d/Y"
-        )
-        dt_fmts = (
-            DateFormat("y-m-dTH:M:S.s"),
-            DateFormat("y-m-dTH:M:S"),
-            DateFormat("y-m-d H:M:S.s"),
-            DateFormat("y-m-d H:M:S")
-        )
-
-        for fmt in date_fmts
+        for fmt in (dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d",
+                    dateformat"m/d/y", dateformat"m/d/Y")
             try
                 dob_parsed = Date(s, fmt); break
             catch
             end
         end
         if dob_parsed === nothing
-            for fmt in dt_fmts
+            for fmt in (DateFormat("y-m-dTH:M:S.s"), DateFormat("y-m-dTH:M:S"),
+                        DateFormat("y-m-d H:M:S.s"), DateFormat("y-m-d H:M:S"))
                 try
                     dob_parsed = Date(DateTime(s, fmt)); break
                 catch
                 end
             end
         end
-
         dob_parsed === nothing && return nothing
         dob = dob_parsed
     else
         return nothing
     end
 
-    # compute age
     a = year(refdate) - year(dob)
     if (month(refdate), day(refdate)) < (month(dob), day(dob))
         a -= 1
     end
-    return a
+    # clamp between min_age and max_age
+    return clamp(a, min_age, max_age)
+end
+
+function age_check(col::AbstractVector; refdate::Date = today(), max_age::Int = 90, min_age::Int = 0, missing_as = nothing)
+    out = Vector{Union{Missing, Int}}(undef, length(col))
+    @inbounds for i in eachindex(col)
+        v = age_check(col[i]; refdate=refdate, max_age=max_age, min_age=min_age)
+        out[i] = v === nothing ? (ismissing(missing_as) ? missing : missing_as) : v
+    end
+    return out
 end
 
 
