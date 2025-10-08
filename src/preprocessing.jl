@@ -69,22 +69,37 @@ Returns `nothing` if parsing fails.
 """
 # Scalar: return YEAR ONLY (Int) from DOB, capped so age <= max_age
 # Return YEAR ONLY (Int) from DOB, capped so birth_year >= year(refdate) - max_age
-function age_check(val; refdate::Date = today(), max_age::Int = 90)
+# Return YEAR ONLY (Int) from DOB, capped so age <= max_age as of refdate.
+function age_check(val; refdate::Any = today(), max_age::Int = 90)
     # --- early exits ---
     if val === missing || val === nothing
         return nothing
     end
 
-    # --- normalize refdate to a Date (handles DateTime / String) ---
+    # --- normalize refdate to a Date (handles DateTime or strings like: Date(2000-10-07), Date(2000,10,7), Date("2000-10-07"), or "2000-10-07") ---
     if refdate isa DateTime
         refdate = Date(refdate)
     elseif refdate isa AbstractString
-        try
-            refdate = Date(refdate)  # expects "YYYY-MM-DD"
-        catch
-            # leave as-is if not parseable; assume caller provided a Date
+        s = strip(String(refdate))
+        # Date(YYYY-MM-DD)
+        if (m = match(r"^Date\((\d{4})-(\d{1,2})-(\d{1,2})\)$", s)) !== nothing
+            refdate = Date(parse(Int, m.captures[1]), parse(Int, m.captures[2]), parse(Int, m.captures[3]))
+        # Date(YYYY,MM,DD)
+        elseif (m = match(r"^Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})\)$", s)) !== nothing
+            refdate = Date(parse(Int, m.captures[1]), parse(Int, m.captures[2]), parse(Int, m.captures[3]))
+        # Date("YYYY-MM-DD")
+        elseif (m = match(r"^Date\(\"(\d{4}-\d{1,2}-\d{1,2})\"\)$", s)) !== nothing
+            refdate = Date(m.captures[1])
+        else
+            # plain ISO string "YYYY-MM-DD" etc.
+            try
+                refdate = Date(s)
+            catch
+                # leave as-is if not parseable; later ops would error rather than silently mis-cap
+            end
         end
     end
+    refdate isa Date || error("age_check: refdate must resolve to a Date; got $(typeof(refdate))")
 
     # --- parse input value to a Date (robust) ---
     dob::Union{Nothing,Date} = nothing
@@ -102,7 +117,7 @@ function age_check(val; refdate::Date = today(), max_age::Int = 90)
     elseif val isa AbstractString
         s = strip(String(val))
         isempty(s) && return nothing
-        # strip trailing Z, normalize timezone like +hh:mm -> +hhmm
+        # strip trailing Z; normalize timezone +hh:mm -> +hhmm
         s = replace(s, r"Z$" => "", r"([+-]\d{2}):?(\d{2})$" => s"\1\2")
         # try Date formats
         for fmt in (dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d",
@@ -128,10 +143,10 @@ function age_check(val; refdate::Date = today(), max_age::Int = 90)
 
     dob === nothing && return nothing
 
-    # --- YEAR-ONLY cap logic ---
-    cap_year = year(refdate) - max_age
-    birth_year = year(dob)
-    return max(birth_year, cap_year)
+    # --- cap: anyone OLDER than max_age as of refdate moves to cap_year ---
+    cap_line = refdate - Year(max_age)      # e.g., 2000-10-07 - 20y = 1980-10-07
+    cap_year = year(cap_line)
+    return (dob < cap_line) ? cap_year : year(dob)
 end
 
 # age_check(x; max_age::Int = 90) = _age_check_any(x, max_age)
