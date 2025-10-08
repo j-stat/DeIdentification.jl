@@ -114,13 +114,19 @@ function age_check(val; refdate::Date = today(), max_age::Int = 90)
 
     dob === nothing && return nothing
 
-    # --- compute year and apply max-age cap ---
-    birth_year = year(dob)
-    cap_year   = year(refdate) - max_age
+    # --- compute exact age on refdate and cap only if STRICTLY over max_age ---
+    birth_y, birth_m, birth_d = year(dob), month(dob), day(dob)
+    ref_y,   ref_m,   ref_d   = year(refdate), month(refdate), day(refdate)
+    age = ref_y - birth_y - ((ref_m, ref_d) < (birth_m, birth_d) ? 1 : 0)
 
-    # If someone would be older than max_age, move their year up to the cap line.
-    # (i.e., cap to the most recent allowable birth year)
-    return max(birth_year, cap_year)
+    # --- cap only if STRICTLY over max_age ---
+    if age > max_age
+        # Cap to the most recent allowable birth year relative to refdate
+        cap_year = year(refdate - Year(max_age))
+        return cap_year
+    else
+        return birth_y
+    end
 end
 
 # age_check(x; max_age::Int = 90) = _age_check_any(x, max_age)
