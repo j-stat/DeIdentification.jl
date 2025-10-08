@@ -49,10 +49,6 @@ function year_only(val::AbstractString)
 end
 
 # AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
-# keep values ≤ max_age, blank out (missing) if > max_age
-# Keep ages ≤ max_age; set > max_age (or non-parsable) to `missing`.
-# Works for strings like "52", numbers like 52, and `missing`.
-# Keep ages ≤ max_age; blank (> max_age) or non-parsable as `nothing`
 # Works with DOB variable 
 # Has a default reference year of today that can be overidden 
 """
@@ -67,8 +63,6 @@ Accepts:
 
 Returns `nothing` if parsing fails.
 """
-# Scalar: return YEAR ONLY (Int) from DOB, capped so age <= max_age
-# Return YEAR ONLY (Int) from DOB, capped so birth_year >= year(refdate) - max_age
 # Return YEAR ONLY (Int) from DOB, capped so age <= max_age as of refdate.
 function age_check(val; refdate::Any = today(), max_age::Int = 90, debug::Bool=false)
     # --- early exits ---
@@ -111,10 +105,10 @@ function age_check(val; refdate::Any = today(), max_age::Int = 90, debug::Bool=f
         # If it "looks like a year" (e.g., 1972), treat as DOB year.
         v = Int(floor(val))
         yr = year(refdate)
-        if 1500 <= v <= (yr + 1)  # generous upper bound
-            dob = Date(v, 12, 31) # use end-of-year so 1980 stays uncapped
+        if 1500 <= v <= (yr + 1)  # upper bound
+            dob = Date(v, 12, 31) # use end-of-year so things stay capped 
         else
-            # Excel serial (Windows origin 1899-12-30)
+            # Excel serial 
             try
                 dob = Date(1899,12,30) + Day(v)
             catch
@@ -167,26 +161,6 @@ function age_check(val; refdate::Any = today(), max_age::Int = 90, debug::Bool=f
 
     return y
 end
-
-# age_check(x; max_age::Int = 90) = _age_check_any(x, max_age)
-
-# # Methods
-# # Keep ages ≤ max_age; blank (> max_age) or non-parsable as `nothing`
-# age_check(x; max_age::Int = 40) = _age_check_any(x, max_age)
-
-# # Methods
-# _age_check_any(::Missing, ::Int) = nothing
-
-# function _age_check_any(x::AbstractString, max_age::Int)
-#     s = strip(x)
-#     p = tryparse(Int, s)
-#     p === nothing ? nothing : (p <= max_age ? p : nothing)
-# end
-
-# function _age_check_any(x::Real, max_age::Int)
-#     a = Int(floor(x))
-#     return (0 ≤ a ≤ max_age) ? a : nothing
-# end
 
 
 
