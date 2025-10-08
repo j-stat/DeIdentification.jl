@@ -68,6 +68,7 @@ Accepts:
 Returns `nothing` if parsing fails.
 """
 # Scalar: return YEAR ONLY (Int) from DOB, capped so age <= max_age
+# Return YEAR ONLY (Int) from DOB, capped so birth_year >= year(refdate) - max_age
 function age_check(val; refdate::Date = today(), max_age::Int = 90)
     # --- early exits ---
     if val === missing || val === nothing
@@ -127,17 +128,10 @@ function age_check(val; refdate::Date = today(), max_age::Int = 90)
 
     dob === nothing && return nothing
 
-    # --- cap anyone OLDER than max_age as of refdate ---
-    cap_line = refdate - Year(max_age)   # e.g., 2000-10-07 - 20y = 1980-10-07
-    cap_year = year(cap_line)
-
-    if dob < cap_line
-        # strictly older than max_age -> move up to cap year
-        return cap_year
-    else
-        # age <= max_age -> keep true birth year
-        return year(dob)
-    end
+    # --- YEAR-ONLY cap logic ---
+    cap_year = year(refdate) - max_age
+    birth_year = year(dob)
+    return max(birth_year, cap_year)
 end
 
 # age_check(x; max_age::Int = 90) = _age_check_any(x, max_age)
