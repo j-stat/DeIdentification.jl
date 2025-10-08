@@ -70,73 +70,85 @@ Returns `nothing` if parsing fails.
 # Scalar: return YEAR ONLY (Int) from DOB, capped so age <= max_age
 # Return YEAR ONLY (Int) from DOB, capped so birth_year >= year(refdate) - max_age
 # Return YEAR ONLY (Int) from DOB, capped so age <= max_age as of refdate.
-function age_check(val; refdate::Any = today(), max_age::Int = 90)
+function age_check(val; refdate::Any = today(), max_age::Int = 90, debug::Bool=false)
     # --- early exits ---
     if val === missing || val === nothing
         return nothing
     end
 
-    # --- normalize refdate to a Date (handles DateTime or strings like: Date(2000-10-07), Date(2000,10,7), Date("2000-10-07"), or "2000-10-07") ---
+    # --- normalize refdate to a Date ---
     if refdate isa DateTime
         refdate = Date(refdate)
     elseif refdate isa AbstractString
         s = strip(String(refdate))
-        # Date(YYYY-MM-DD)
         if (m = match(r"^Date\((\d{4})-(\d{1,2})-(\d{1,2})\)$", s)) !== nothing
             refdate = Date(parse(Int, m.captures[1]), parse(Int, m.captures[2]), parse(Int, m.captures[3]))
-        # Date(YYYY,MM,DD)
         elseif (m = match(r"^Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})\)$", s)) !== nothing
             refdate = Date(parse(Int, m.captures[1]), parse(Int, m.captures[2]), parse(Int, m.captures[3]))
-        # Date("YYYY-MM-DD")
         elseif (m = match(r"^Date\(\"(\d{4}-\d{1,2}-\d{1,2})\"\)$", s)) !== nothing
             refdate = Date(m.captures[1])
         else
-            # plain ISO string "YYYY-MM-DD" etc.
             try
-                refdate = Date(s)
+                refdate = Date(s)  # ISO "YYYY-MM-DD"
             catch
-                # leave as-is if not parseable; later ops would error rather than silently mis-cap
+                error("age_check: refdate must resolve to a Date; got \"$s\"")
             end
         end
+    elseif !(refdate isa Date)
+        error("age_check: refdate must be Date/DateTime/String; got $(typeof(refdate))")
     end
-    refdate isa Date || error("age_check: refdate must resolve to a Date; got $(typeof(refdate))")
 
     # --- parse input value to a Date (robust) ---
     dob::Union{Nothing,Date} = nothing
+
     if val isa Date
         dob = val
+
     elseif val isa DateTime
         dob = Date(val)
+
     elseif val isa Integer || val isa AbstractFloat
-        # Excel serial (Windows origin 1899-12-30)
-        try
-            dob = Date(1899,12,30) + Day(floor(Int, val))
-        catch
-            return nothing
+        # If it "looks like a year" (e.g., 1972), treat as DOB year.
+        v = Int(floor(val))
+        yr = year(refdate)
+        if 1500 <= v <= (yr + 1)  # generous upper bound
+            dob = Date(v, 12, 31) # use end-of-year so 1980 stays uncapped
+        else
+            # Excel serial (Windows origin 1899-12-30)
+            try
+                dob = Date(1899,12,30) + Day(v)
+            catch
+                return nothing
+            end
         end
+
     elseif val isa AbstractString
         s = strip(String(val))
         isempty(s) && return nothing
-        # strip trailing Z; normalize timezone +hh:mm -> +hhmm
-        s = replace(s, r"Z$" => "", r"([+-]\d{2}):?(\d{2})$" => s"\1\2")
-        # try Date formats
-        for fmt in (dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d",
-                    dateformat"m/d/y", dateformat"m/d/Y")
-            try
-                dob = Date(s, fmt); break
-            catch
+
+        # If it's exactly a 4-digit year, treat as DOB year.
+        if (m = match(r"^\s*(\d{4})\s*$", s)) !== nothing
+            y = parse(Int, m.captures[1])
+            if 1500 <= y <= (year(refdate) + 1)
+                dob = Date(y, 12, 31)   # end-of-year keeps boundary years uncapped
             end
         end
-        # try DateTime formats -> Date
+
+        # If not already resolved, try DateTime formats
         if dob === nothing
-            for fmt in (DateFormat("y-m-dTH:M:S.s"), DateFormat("y-m-dTH:M:S"),
-                        DateFormat("y-m-d H:M:S.s"), DateFormat("y-m-d H:M:S"))
-                try
-                    dob = Date(DateTime(s, fmt)); break
-                catch
+            s = replace(s, r"Z$" => "", r"([+-]\d{2}):?(\d{2})$" => s"\1\2")  # normalize TZ
+            for fmt in (dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d",
+                        dateformat"m/d/y", dateformat"m/d/Y")
+                try; dob = Date(s, fmt); break; catch; end
+            end
+            if dob === nothing
+                for fmt in (DateFormat("y-m-dTH:M:S.s"), DateFormat("y-m-dTH:M:S"),
+                            DateFormat("y-m-d H:M:S.s"), DateFormat("y-m-d H:M:S"))
+                    try; dob = Date(DateTime(s, fmt)); break; catch; end
                 end
             end
         end
+
     else
         return nothing
     end
@@ -144,9 +156,16 @@ function age_check(val; refdate::Any = today(), max_age::Int = 90)
     dob === nothing && return nothing
 
     # --- cap: anyone OLDER than max_age as of refdate moves to cap_year ---
-    cap_line = refdate - Year(max_age)      # e.g., 2000-10-07 - 20y = 1980-10-07
+    cap_line = refdate - Year(max_age)   # e.g., 2000-10-07 - 20y = 1980-10-07
     cap_year = year(cap_line)
-    return (dob < cap_line) ? cap_year : year(dob)
+    will_cap = dob < cap_line
+    y = will_cap ? cap_year : year(dob)
+
+    if debug
+        @info "age_check" (; val, dob, refdate, max_age, cap_line, cap_year, will_cap, out=y)
+    end
+
+    return y
 end
 
 # age_check(x; max_age::Int = 90) = _age_check_any(x, max_age)
