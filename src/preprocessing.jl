@@ -69,11 +69,23 @@ Returns `nothing` if parsing fails.
 """
 # Scalar: return YEAR ONLY (Int) from DOB, capped so age <= max_age
 function age_check(val; refdate::Date = today(), max_age::Int = 90)
-    # --- parse to Date (same robust rules as before) ---
+    # --- early exits ---
     if val === missing || val === nothing
         return nothing
     end
 
+    # --- normalize refdate to a Date (handles DateTime / String) ---
+    if refdate isa DateTime
+        refdate = Date(refdate)
+    elseif refdate isa AbstractString
+        try
+            refdate = Date(refdate)  # expects "YYYY-MM-DD"
+        catch
+            # leave as-is if not parseable; assume caller provided a Date
+        end
+    end
+
+    # --- parse input value to a Date (robust) ---
     dob::Union{Nothing,Date} = nothing
     if val isa Date
         dob = val
@@ -89,6 +101,7 @@ function age_check(val; refdate::Date = today(), max_age::Int = 90)
     elseif val isa AbstractString
         s = strip(String(val))
         isempty(s) && return nothing
+        # strip trailing Z, normalize timezone like +hh:mm -> +hhmm
         s = replace(s, r"Z$" => "", r"([+-]\d{2}):?(\d{2})$" => s"\1\2")
         # try Date formats
         for fmt in (dateformat"y-m-d", dateformat"Y-m-d", dateformat"y/m/d",
@@ -114,18 +127,16 @@ function age_check(val; refdate::Date = today(), max_age::Int = 90)
 
     dob === nothing && return nothing
 
-    # --- compute exact age on refdate and cap only if STRICTLY over max_age ---
-    birth_y, birth_m, birth_d = year(dob), month(dob), day(dob)
-    ref_y,   ref_m,   ref_d   = year(refdate), month(refdate), day(refdate)
-    age = ref_y - birth_y - ((ref_m, ref_d) < (birth_m, birth_d) ? 1 : 0)
+    # --- cap anyone OLDER than max_age as of refdate ---
+    cap_line = refdate - Year(max_age)   # e.g., 2000-10-07 - 20y = 1980-10-07
+    cap_year = year(cap_line)
 
-    # --- cap only if STRICTLY over max_age ---
-    if age > max_age
-        # Cap to the most recent allowable birth year relative to refdate
-        cap_year = year(refdate - Year(max_age))
+    if dob < cap_line
+        # strictly older than max_age -> move up to cap year
         return cap_year
     else
-        return birth_y
+        # age <= max_age -> keep true birth year
+        return year(dob)
     end
 end
 
