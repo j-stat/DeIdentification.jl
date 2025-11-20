@@ -164,28 +164,37 @@ end
 
 # ---- AGE CHECK function for numeric age 
 function age_check_numeric(age; max_age::Int=90)
-    # Normalize to Int
+    # Normalize to integer or return nothing/missing
     a = if age isa Missing
-        return (age = missing, capped = false)
+        missing
+
     elseif age isa Int
         age
-elseif age isa Real
-    if isnan(age)
-        return nothing
-    else
-        return Int(floor(age))
-    end
+
+    elseif age isa Real
+        if isnan(age)
+            return nothing
+        else
+            Int(floor(age))
+        end
+
     elseif age isa AbstractString
         try
             Int(floor(parse(Float64, strip(age))))
         catch
             return nothing
         end
+
     else
         return nothing
     end
 
-    # Reject negatives
+    # Missing stays missing
+    if a === missing
+        return (age = missing, capped = false)
+    end
+
+    # Reject negative ages
     if a < 0
         return nothing
     end
@@ -197,7 +206,6 @@ elseif age isa Real
         return (age = a, capped = false)
     end
 end
-
 
 
 
