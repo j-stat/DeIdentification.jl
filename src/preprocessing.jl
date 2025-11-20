@@ -1,6 +1,6 @@
 using Dates
 
-# YEAR ONLY - take in a date string and extract just the year component
+# ----- YEAR ONLY - take in a date string and extract just the year component
 function year_only(val::AbstractString)
     raw = strip(val)
     if isempty(raw)
@@ -48,7 +48,7 @@ function year_only(val::AbstractString)
     return m === nothing ? nothing : m.captures[1]
 end
 
-# AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
+# ------ AGE CHECK - check if input is a number and is below max age, if over max age value set to nothing 
 # Works with DOB variable 
 # Has a default reference year of today that can be overidden 
 """
@@ -161,6 +161,39 @@ function age_check(val; refdate::Any = today(), max_age::Int = 90, debug::Bool=f
 
     return y
 end
+
+# ---- AGE CHECK function for numeric age 
+function age_check_numeric(age; max_age::Int=90)
+    # Normalize to Int
+    a = if age isa Missing
+        return (age = missing, capped = false)
+    elseif age isa Int
+        age
+    elseif age isa Real
+        isnan(age) ? return nothing : Int(floor(age))
+    elseif age isa AbstractString
+        try
+            Int(floor(parse(Float64, strip(age))))
+        catch
+            return nothing
+        end
+    else
+        return nothing
+    end
+
+    # Reject negatives
+    if a < 0
+        return nothing
+    end
+
+    # Cap if needed
+    if a > max_age
+        return (age = max_age, capped = true)
+    else
+        return (age = a, capped = false)
+    end
+end
+
 
 
 
