@@ -162,7 +162,7 @@ function age_check(val; refdate::Any = today(), max_age::Int = 90, debug::Bool=f
     return y
 end
 
-# ---- AGE CHECK function for numeric age 
+# ---- AGE CHECK NUMERIC function for numeric age 
 function age_check_numeric(age; max_age::Int=90)
     # Normalize to integer or return nothing/missing
     a = if age isa Missing
