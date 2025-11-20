@@ -169,8 +169,12 @@ function age_check_numeric(age; max_age::Int=90)
         return (age = missing, capped = false)
     elseif age isa Int
         age
-    elseif age isa Real
-        isnan(age) ? return nothing : Int(floor(age))
+elseif age isa Real
+    if isnan(age)
+        return nothing
+    else
+        return Int(floor(age))
+    end
     elseif age isa AbstractString
         try
             Int(floor(parse(Float64, strip(age))))
